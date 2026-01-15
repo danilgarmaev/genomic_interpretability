@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environments
+.venv/
+venv/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Data/artifacts (keep folder structure, ignore contents)
+data/**
+!data/.gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+reports/**
+!reports/.gitkeep
+!reports/figures/.gitkeep
