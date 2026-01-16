@@ -82,5 +82,4 @@ def predict(sequence: str) -> torch.Tensor:
     with torch.no_grad():
         outputs = model(**encoded)
 
-    # outputs.logits: (batch=1, seq_len, vocab_size)
     return outputs.logits[0].detach().cpu()

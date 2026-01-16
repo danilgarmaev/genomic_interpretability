@@ -18,9 +18,9 @@ def _add_src_to_path() -> None:
 def main() -> None:
     _add_src_to_path()
 
-    from infer import predict  # noqa: WPS433 (runtime import for path setup)
+    from infer import predict
 
-    sequence = "ACGT" * 32  # 128 bp toy example
+    sequence = "ACGT" * 32
     logits = predict(sequence)
 
     print(f"Sequence length: {len(sequence)}")
