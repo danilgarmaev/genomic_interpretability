@@ -26,7 +26,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--variants",
         required=True,
-        help="Path or URL to variants file (.csv/.tsv/.parquet/.json/.jsonl).",
+        help="Path or URL to variants file (.csv/.tsv/.parquet/.json/.jsonl/.vcf).",
+    )
+    p.add_argument(
+        "--gene",
+        default=None,
+        help="Optional gene symbol filter (e.g., TP53) when variants come from ClinVar VCF.",
+    )
+    p.add_argument(
+        "--vcf-limit",
+        type=int,
+        default=5000,
+        help="Max number of VCF records to load after filtering (keeps runs fast).",
     )
     p.add_argument(
         "--genome-fasta",
@@ -49,7 +60,11 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    variants = load_variants(args.variants)
+    variants = load_variants(
+        args.variants,
+        gene=(str(args.gene) if args.gene else None),
+        limit=(int(args.vcf_limit) if args.vcf_limit and str(args.variants).lower().endswith((".vcf", ".vcf.gz")) else None),
+    )
     if not variants:
         raise SystemExit("No variants loaded. Check the input file.")
 

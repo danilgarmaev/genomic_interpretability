@@ -11,12 +11,14 @@ Notes:
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 import pandas as pd
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -37,16 +39,117 @@ def _normalize_chrom(chrom: Any) -> str:
 
 def _infer_format(path_or_url: str) -> str:
     lower = path_or_url.lower()
-    for ext in (".csv", ".tsv", ".txt", ".parquet", ".json", ".jsonl"):
+    for ext in (".csv", ".tsv", ".txt", ".parquet", ".json", ".jsonl", ".vcf", ".vcf.gz"):
         if lower.endswith(ext):
             return ext.lstrip(".")
     return ""
 
 
-def load_variants(path_or_url: str) -> List[Variant]:
+def _parse_info_field(info_str: str) -> Dict[str, Any]:
+    info: Dict[str, Any] = {}
+    if not info_str or info_str == ".":
+        return info
+    for item in info_str.split(";"):
+        if not item:
+            continue
+        if "=" in item:
+            k, v = item.split("=", 1)
+            info[k] = v
+        else:
+            info[item] = True
+    return info
+
+
+def _clinvar_label_from_clnsig(clnsig: Optional[str]) -> Optional[str]:
+    if not clnsig:
+        return None
+    val = clnsig.lower().replace(" ", "_")
+    # ClinVar sometimes stores multiple values separated by |.
+    if "conflict" in val:
+        return "conflicting"
+    if "pathogenic" in val:
+        return "pathogenic"
+    if "benign" in val:
+        return "benign"
+    if "uncertain" in val:
+        return "uncertain"
+    return None
+
+
+def _geneinfo_has_gene(geneinfo: str, gene: str) -> bool:
+    if not geneinfo or not gene:
+        return False
+    gene = gene.strip().upper()
+    for entry in str(geneinfo).split("|"):
+        entry = entry.strip()
+        if not entry:
+            continue
+        symbol = entry.split(":", 1)[0].strip().upper()
+        if symbol == gene:
+            return True
+    return False
+
+
+def _load_vcf_variants(path: str, *, gene: Optional[str] = None, limit: Optional[int] = None) -> List[Variant]:
+    opener = gzip.open if path.lower().endswith(".gz") else open
+    variants: List[Variant] = []
+
+    with opener(path, "rt", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if not line or line.startswith("#"):
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) < 8:
+                continue
+            chrom, pos, var_id, ref, alt, _qual, _flt, info_str = parts[:8]
+            if alt == "." or not alt:
+                continue
+
+            info = _parse_info_field(info_str)
+
+            if gene is not None:
+                geneinfo = str(info.get("GENEINFO", ""))
+                if not _geneinfo_has_gene(geneinfo, gene):
+                    continue
+
+            label = _clinvar_label_from_clnsig(info.get("CLNSIG"))
+
+            # Split multi-ALT records into separate variants.
+            for one_alt in str(alt).split(","):
+                one_alt = one_alt.strip().upper()
+                if not one_alt:
+                    continue
+
+                extra: Dict[str, Any] = dict(info)
+                extra["source"] = "clinvar_vcf"
+
+                variants.append(
+                    Variant(
+                        chrom=_normalize_chrom(chrom),
+                        pos=int(pos),
+                        ref=str(ref).strip().upper(),
+                        alt=one_alt,
+                        label=label,
+                        id=(None if var_id in {".", ""} else str(var_id)),
+                        extra=extra,
+                    )
+                )
+
+                if limit is not None and len(variants) >= limit:
+                    return variants
+
+    return variants
+
+
+def load_variants(
+    path_or_url: str,
+    *,
+    gene: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> List[Variant]:
     """Load variants from a local path or URL.
 
-    Supports: CSV/TSV/TXT/Parquet/JSON/JSONL.
+    Supports: CSV/TSV/TXT/Parquet/JSON/JSONL/VCF.
 
     Expected columns (best effort):
       - chrom, pos, ref, alt
@@ -63,8 +166,11 @@ def load_variants(path_or_url: str) -> List[Variant]:
     fmt = _infer_format(path_or_url)
     if not fmt:
         raise ValueError(
-            "Unsupported file type for path_or_url. Supported: .csv .tsv .txt .parquet .json .jsonl"
+            "Unsupported file type for path_or_url. Supported: .csv .tsv .txt .parquet .json .jsonl .vcf .vcf.gz"
         )
+
+    if fmt in {"vcf", "vcf.gz"}:
+        return _load_vcf_variants(path_or_url, gene=gene, limit=limit)
 
     if fmt in {"csv", "tsv", "txt"}:
         sep = "," if fmt == "csv" else "\t"
@@ -156,7 +262,7 @@ def select_subset(
     if not variants:
         return []
 
-    rng = pd.RandomState(seed)
+    rng = np.random.RandomState(seed)
 
     if stratify_by == "label":
         labeled = [v for v in variants if v.label is not None and str(v.label) != "nan"]

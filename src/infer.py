@@ -83,3 +83,43 @@ def predict(sequence: str) -> torch.Tensor:
         outputs = model(**encoded)
 
     return outputs.logits[0].detach().cpu()
+
+
+def embed(sequence: str) -> torch.Tensor:
+    """Compute a mean-pooled embedding from the model's last hidden state.
+
+    This is used for zero-shot variant impact scoring by comparing ref vs alt
+    embeddings (e.g., cosine similarity, L2 distance).
+
+    Returns:
+        A 1D torch.Tensor of shape (hidden_dim,).
+    """
+
+    if not isinstance(sequence, str) or not sequence.strip():
+        raise ValueError("sequence must be a non-empty string")
+
+    sequence = "".join(sequence.split()).upper()
+
+    tokenizer, model, device = load_model()
+    encoded = tokenizer(sequence, return_tensors="pt")
+    encoded = {k: v.to(device) for k, v in encoded.items()}
+
+    with torch.no_grad():
+        outputs = model(**encoded, output_hidden_states=True, return_dict=True)
+
+    if hasattr(outputs, "last_hidden_state") and outputs.last_hidden_state is not None:
+        hidden = outputs.last_hidden_state
+    else:
+        # MaskedLM models usually expose hidden states when requested.
+        hidden = outputs.hidden_states[-1]
+
+    # hidden: (batch=1, seq_len, hidden_dim)
+    attention_mask = encoded.get("attention_mask")
+    if attention_mask is None:
+        pooled = hidden.mean(dim=1)[0]
+        return pooled.detach().cpu()
+
+    mask = attention_mask.unsqueeze(-1).to(hidden.dtype)  # (1, seq_len, 1)
+    denom = mask.sum(dim=1).clamp_min(1.0)  # (1, 1)
+    pooled = (hidden * mask).sum(dim=1) / denom  # (1, hidden_dim)
+    return pooled[0].detach().cpu()
