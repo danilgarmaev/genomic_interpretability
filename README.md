@@ -53,10 +53,15 @@ Outputs:
 
 ## Data & Artifacts
 
-This repo is set up so that large or derived artifacts are **not** committed by default.
+This repo is set up so that large artifacts are **not** committed by default.
 
 - `results/` and `reports/figures/` are ignored via `.gitignore` (they are reproducible outputs).
-- `data/processed/` is also ignored; you can generate it locally.
+- `results/` and `reports/figures/` are ignored via `.gitignore` (they are reproducible outputs).
+
+For convenience, a small processed parquet used by the probe workflows is included:
+- `data/processed/my_processed_clinvar.parquet`
+
+If you prefer not to rely on committed processed data, you can regenerate it locally (instructions below).
 
 ### Probe parquet schema
 

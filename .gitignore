@@ -19,7 +19,10 @@ ENV/
 data/**
 !data/.gitkeep
 !data/raw/.gitkeep
+!data/processed/
 !data/processed/.gitkeep
+!data/processed/my_processed_clinvar.parquet
+!data/processed/README.md
 reports/**
 !reports/.gitkeep
 !reports/figures/.gitkeep
