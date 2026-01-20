@@ -2,6 +2,8 @@
 
 Reproducible analysis code for mechanistic interpretability experiments on Nucleotide Transformer v2 using ClinVar-derived variant sequences.
 
+Author: Danil Garmaev
+
 This repository contains the scripts used to train linear probes, run activation patching, and perform controlled attention-head ablations reported in the accompanying write-up.
 
 ## Environment
