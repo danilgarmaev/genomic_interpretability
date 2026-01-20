@@ -4,3 +4,8 @@ numpy
 matplotlib
 pandas
 pyfaidx
+tqdm
+scikit-learn
+pyarrow
+seaborn
+pytest
