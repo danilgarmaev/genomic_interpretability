@@ -60,6 +60,17 @@ python scripts/build_probe_parquet_from_sequences.py \
   --out data/processed/my_processed_clinvar.parquet
 ```
 
+Note: in this repo, an example sequences file may already exist at:
+- `results/legacy/sequences.jsonl`
+
+If so, you can run:
+
+```bash
+python scripts/build_probe_parquet_from_sequences.py \
+  --sequences results/legacy/sequences.jsonl \
+  --out data/processed/my_processed_clinvar.parquet
+```
+
 ## Reproducing the Experiments
 
 All commands assume the virtual environment is active.
